@@ -13,7 +13,43 @@ int cmpbyready(const void *a, const void *b) {
 	return ((proc *)a)->readyTime - ((proc *)b)->readyTime;
 }
 
+typedef struct Q{
+	int p;
+	struct Q *next;
+	}q;
 
+q *head = NULL, *tail = NULL;
+int isEmpty(){
+	if(head == NULL)
+		return 1;
+	return 0;
+}
+
+q * create(int n){
+	q *new = (q*)malloc(sizeof(q));
+	new->p = n;
+	new->next = NULL;
+	return new;
+}
+
+void enq(int n){
+	if(head == NULL){
+		head = tail = create(n);
+	}
+	else{
+		tail->next = create(n);
+		tail = tail->next;
+	}
+	return;
+}
+
+int deq(){
+	q *temp = head->next;
+	int p = head->p;
+	free(head);
+	head = temp;
+	return p;
+}
 
 void scheduler(proc *procarr, int procnum, int policy){
 	assignCPU(getpid(), 0);
@@ -26,6 +62,8 @@ void scheduler(proc *procarr, int procnum, int policy){
 			assignCPU(procarr[waitingprocnum].pid, 1);
 			block(procarr[waitingprocnum].pid);
 			printf("%s %d\n", procarr[waitingprocnum].name, procarr[waitingprocnum].pid);
+			fflush(stdout);
+			enq(waitingprocnum);
 		}
 		if(runningproc == -1 || procarr[runningproc].execTime <= 0){
 			if(runningproc != -1){
@@ -33,13 +71,12 @@ void scheduler(proc *procarr, int procnum, int policy){
 			}
 			runningproc = -1;
 			if(policy == FIFO || policy == RR){
-				for(int i = 0; i < waitingprocnum; i ++){
-					if(procarr[i].execTime != 0){
-						runningproc = i;
-						lastswitchtime = time;
-						break;
-					}
+				if(!isEmpty()){
+					runningproc = deq();
+					lastswitchtime = time;
 				}
+				else
+					runningproc = -1;
 			}
 			else{
 				int min = 2147483647;
@@ -72,12 +109,12 @@ void scheduler(proc *procarr, int procnum, int policy){
 		else if(policy == RR){
 			 if(time - lastswitchtime == RRcycle){
 				 block(procarr[runningproc].pid);
-				 for(int i = 1; i <= waitingprocnum; i ++){
-					 if(procarr[(runningproc + i) % waitingprocnum].execTime != 0){
-						 runningproc = (runningproc + i) % waitingprocnum;
-						 break;
-					 }
+				 enq(runningproc);
+				 if(!isEmpty()){
+					 runningproc = deq();
 				 }
+				 else
+					 runningproc = -1;
 				 lastswitchtime = time;
 				 if(runningproc != -1)
 					wakeup(procarr[runningproc].pid);
